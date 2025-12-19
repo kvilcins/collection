@@ -10,19 +10,6 @@ use Inertia\Inertia;
 Route::get('/', [MovieController::class, 'index'])->name('home');
 Route::get('/movies/{movie}', [MovieController::class, 'show'])->name('movies.show');
 
-//Route::get('/', function () {
-//    return Inertia::render('Welcome', [
-//        'canLogin' => Route::has('login'),
-//        'canRegister' => Route::has('register'),
-//        'laravelVersion' => Application::VERSION,
-//        'phpVersion' => PHP_VERSION,
-//    ]);
-//});
-
-//Route::get('/dashboard', function () {
-//    return Inertia::render('Dashboard');
-//})->middleware(['auth', 'verified'])->name('dashboard');
-
 Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', [UserMovieController::class, 'index'])->name('dashboard');
     Route::post('/folders', [UserMovieController::class, 'storeFolder'])->name('folders.store');

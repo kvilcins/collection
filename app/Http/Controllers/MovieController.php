@@ -47,7 +47,8 @@ class MovieController extends Controller
                 'rating' => $movie->average_rating,
                 'genres' => $movie->genres->pluck('name'),
                 'tags' => $movie->tags->pluck('name'),
-            ]
+            ],
+            'folders' => auth()->check() ? auth()->user()->folders : []
         ]);
     }
 }
