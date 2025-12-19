@@ -4,16 +4,15 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\MovieResource\Pages;
 use App\Models\Movie;
+use App\Models\Genre;
+use App\Models\Tag;
 use Filament\Forms;
 use Filament\Forms\Form;
-use Illuminate\Support\Facades\Http;
-use Filament\Forms\Components\Actions\Action;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\DatePicker;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 
 class MovieResource extends Resource
 {
@@ -24,71 +23,71 @@ class MovieResource extends Resource
     {
         return $form
             ->schema([
-                TextInput::make('title')
-                    ->label('Movie Title')
+                Forms\Components\TextInput::make('title')
                     ->required()
                     ->suffixAction(
-                        Action::make('searchTmdb')
+                        Forms\Components\Actions\Action::make('search')
                             ->icon('heroicon-m-magnifying-glass')
-                            ->tooltip('Search on TMDb')
                             ->action(function ($state, $set) {
                                 if (!$state) return;
 
                                 $response = Http::withToken(config('services.tmdb.token'))
-                                    ->get("https://api.themoviedb.org/3/search/movie", [
-                                        'query' => $state,
-                                        'language' => 'en-US',
-                                    ])->json();
+                                    ->get("https://api.themoviedb.org/3/search/movie", ['query' => $state])
+                                    ->json();
 
-                                $movie = $response['results'][0] ?? null;
+                                $data = $response['results'][0] ?? null;
 
-                                if ($movie) {
-                                    $set('overview', $movie['overview']);
-                                    $set('release_date', $movie['release_date']);
-                                    $set('tmdb_id', $movie['id']);
-                                    $set('poster_path', $movie['poster_path']);
+                                if ($data) {
+                                    $tmdbId = $data['id'];
+                                    $set('tmdb_id', $tmdbId);
+                                    $set('overview', $data['overview']);
+                                    $set('release_date', $data['release_date']);
+                                    $set('poster_path', $data['poster_path']);
 
-                                    \Filament\Notifications\Notification::make()
-                                        ->title('Movie found!')
-                                        ->success()
-                                        ->send();
-                                } else {
-                                    \Filament\Notifications\Notification::make()
-                                        ->title('Nothing found')
-                                        ->danger()
-                                        ->send();
+                                    if (!empty($data['genre_ids'])) {
+                                        $localGenreIds = Genre::whereIn('tmdb_genre_id', $data['genre_ids'])
+                                            ->pluck('id')->toArray();
+                                        $set('genres', $localGenreIds);
+                                    }
+
+                                    $keywordsData = Http::withToken(config('services.tmdb.token'))
+                                        ->get("https://api.themoviedb.org/3/movie/{$tmdbId}/keywords")
+                                        ->json();
+
+                                    if (!empty($keywordsData['keywords'])) {
+                                        $tagIds = [];
+                                        foreach ($keywordsData['keywords'] as $keyword) {
+                                            $tag = Tag::firstOrCreate(
+                                                ['name' => $keyword['name']],
+                                                ['slug' => Str::slug($keyword['name'])]
+                                            );
+                                            $tagIds[] = $tag->id;
+                                        }
+                                        $set('tags', $tagIds);
+                                    }
+
+                                    \Filament\Notifications\Notification::make()->title('Data & Keywords fetched!')->success()->send();
                                 }
                             })
                     ),
 
-                TextInput::make('tmdb_id')
-                    ->label('TMDb ID')
-                    ->dehydrated()
-                    ->required()
-                    ->readOnly(),
+                Forms\Components\TextInput::make('tmdb_id')->required()->readOnly(),
+                Forms\Components\DatePicker::make('release_date'),
 
-                DatePicker::make('release_date')
-                    ->label('Release Date'),
+                Forms\Components\Select::make('genres')
+                    ->multiple()->relationship('genres', 'name')->preload(),
 
-                Textarea::make('overview')
-                    ->label('Overview')
-                    ->columnSpanFull(),
+                Forms\Components\Select::make('tags')
+                    ->multiple()
+                    ->relationship('tags', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->createOptionForm([
+                        Forms\Components\TextInput::make('name')->required(),
+                    ]),
 
-                TextInput::make('poster_path')
-                    ->label('Poster Path (API)')
-                    ->helperText('Image preview will be implemented later'),
-
-                \Filament\Forms\Components\Select::make('status')
-                    ->options([
-                        'watchlist' => 'Watchlist',
-                        'watched' => 'Watched',
-                    ])
-                    ->default('watchlist')
-                    ->required(),
-
-                \Filament\Forms\Components\Select::make('rating')
-                    ->options(array_combine(range(1, 10), range(1, 10)))
-                    ->nullable(),
+                Forms\Components\Textarea::make('overview')->columnSpanFull(),
+                Forms\Components\TextInput::make('poster_path'),
             ]);
     }
 
@@ -96,40 +95,15 @@ class MovieResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('title')
-                    ->searchable()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('release_date')
-                    ->date()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('tmdb_id')
-                    ->label('TMDb ID'),
                 Tables\Columns\ImageColumn::make('poster_path')
-                    ->label('Poster')
-                    ->state(fn ($record) => $record->poster_path
-                        ? "https://image.tmdb.org/t/p/w200{$record->poster_path}"
-                        : null
-                    )
-                    ->size(100),
+                    ->state(fn($record) => "https://image.tmdb.org/t/p/w200{$record->poster_path}")
+                    ->size(80),
+                Tables\Columns\TextColumn::make('title')->searchable(),
+                Tables\Columns\TextColumn::make('genres.name')->badge()->color('success'),
+                Tables\Columns\TextColumn::make('tags.name')->badge()->color('info')->limitList(3),
             ])
-            ->filters([
-                //
-            ])
-            ->actions([
-                Tables\Actions\EditAction::make(),
-            ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                ]),
-            ]);
-    }
-
-    public static function getRelations(): array
-    {
-        return [
-            //
-        ];
+            ->actions([Tables\Actions\EditAction::make()])
+            ->bulkActions([Tables\Actions\DeleteBulkAction::make()]);
     }
 
     public static function getPages(): array
