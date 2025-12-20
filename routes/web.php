@@ -3,6 +3,7 @@
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\MovieController;
 use App\Http\Controllers\UserMovieController;
+use App\Http\Controllers\PageController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -12,6 +13,11 @@ Route::get('/movies/{movie}', [MovieController::class, 'show'])->name('movies.sh
 
 Route::get('/search', [MovieController::class, 'search'])->name('search.index');
 Route::get('/api/search/suggestions', [MovieController::class, 'suggestions'])->name('search.suggestions');
+
+Route::get('/privacy-policy', [PageController::class, 'privacy'])->name('pages.privacy');
+Route::get('/terms-of-service', [PageController::class, 'terms'])->name('pages.terms');
+Route::get('/contact', [PageController::class, 'contact'])->name('pages.contact');
+Route::post('/contact', [PageController::class, 'submitContact'])->name('contact.submit');
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', [UserMovieController::class, 'index'])->name('dashboard');
