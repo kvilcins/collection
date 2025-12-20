@@ -1,7 +1,8 @@
 <script setup>
-import { Link, router } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import MainLayout from '@/Layouts/MainLayout.vue';
 import { ref, computed } from 'vue';
+import axios from 'axios';
 
 const props = defineProps({
     movies: Array,
@@ -9,21 +10,45 @@ const props = defineProps({
 });
 
 const searchQuery = ref('');
+const suggestions = ref([]);
+const showSuggestions = ref(false);
 const selectedGenre = ref(null);
 const showNotification = ref(false);
+let debounceTimeout = null;
 
 /**
- * Filter movies based on search query and selected genre.
+ * Live Search Logic with Debounce
  */
-const filteredMovies = computed(() => {
-    return props.movies.filter(movie => {
-        const matchesSearch = movie.title.toLowerCase().includes(searchQuery.value.toLowerCase());
-        const matchesGenre = selectedGenre.value
-            ? movie.genres.includes(selectedGenre.value)
-            : true;
+const handleInput = () => {
+    if (debounceTimeout) clearTimeout(debounceTimeout);
 
-        return matchesSearch && matchesGenre;
-    });
+    if (searchQuery.value.length < 2) {
+        suggestions.value = [];
+        showSuggestions.value = false;
+        return;
+    }
+
+    debounceTimeout = setTimeout(async () => {
+        try {
+            const response = await axios.get(route('search.suggestions'), {
+                params: { q: searchQuery.value }
+            });
+            suggestions.value = response.data;
+            showSuggestions.value = true;
+        } catch (error) {
+            console.error(error);
+        }
+    }, 300);
+};
+
+const performSearch = () => {
+    if (!searchQuery.value) return;
+    router.get(route('search.index'), { q: searchQuery.value });
+};
+
+const filteredMovies = computed(() => {
+    if (!selectedGenre.value) return props.movies;
+    return props.movies.filter(movie => movie.genres.includes(selectedGenre.value));
 });
 
 const addToWatchlist = (movieId) => {
@@ -33,33 +58,60 @@ const addToWatchlist = (movieId) => {
         preserveScroll: true,
         onSuccess: () => {
             showNotification.value = true;
-            setTimeout(() => {
-                showNotification.value = false;
-            }, 3000);
+            setTimeout(() => { showNotification.value = false; }, 3000);
         }
     });
 };
 </script>
 
 <template>
+    <Head title="Movie Collection" />
+
     <MainLayout>
-        <div class="p-6 md:p-12 min-h-screen">
+        <div class="p-6 md:p-12 min-h-screen" @click="showSuggestions = false">
 
             <div class="max-w-7xl mx-auto mb-12 flex flex-col items-center text-center">
                 <h1 class="text-5xl font-black mb-6 text-white tracking-tight">
                     Explore <span class="text-yellow-500">Movies</span>
                 </h1>
 
-                <div class="w-full max-w-xl relative mb-8">
+                <div class="w-full max-w-xl relative mb-8 z-50">
                     <input
                         v-model="searchQuery"
+                        @input="handleInput"
+                        @keyup.enter="performSearch"
                         type="text"
-                        placeholder="Find a movie..."
+                        placeholder="Search movies..."
                         class="w-full bg-gray-900 border border-gray-700 text-white px-6 py-4 rounded-full focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none shadow-xl transition"
+                        autocomplete="off"
                     >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-500 absolute right-6 top-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
+
+                    <button @click="performSearch" class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-yellow-500 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </button>
+
+                    <div v-if="showSuggestions && suggestions.length > 0"
+                         class="absolute top-full left-0 w-full mt-2 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl overflow-hidden text-left">
+
+                        <div class="px-4 py-2 text-xs font-bold text-gray-500 uppercase bg-gray-950">Suggestions</div>
+
+                        <Link v-for="movie in suggestions" :key="movie.id"
+                              :href="route('movies.show', movie.id)"
+                              class="flex items-center gap-3 p-3 hover:bg-gray-800 transition border-b border-gray-800 last:border-0"
+                        >
+                            <img v-if="movie.poster_url" :src="movie.poster_url" class="w-10 h-14 object-cover rounded">
+                            <div class="flex-grow">
+                                <div class="text-white font-bold text-sm">{{ movie.title }}</div>
+                                <div class="text-gray-500 text-xs">{{ movie.year }} • IMDb {{ Number(movie.rating).toFixed(1) }}</div>
+                            </div>
+                        </Link>
+
+                        <button @click="performSearch" class="w-full text-center py-3 text-sm text-yellow-500 font-bold hover:bg-gray-800 transition">
+                            View all results for "{{ searchQuery }}"
+                        </button>
+                    </div>
                 </div>
 
                 <div class="flex flex-wrap justify-center gap-2">
@@ -133,10 +185,7 @@ const addToWatchlist = (movieId) => {
 
             <div v-else class="text-center py-20">
                 <div class="text-6xl mb-4 grayscale opacity-30">🔍</div>
-                <p class="text-xl text-gray-500 font-medium">No movies found matching your criteria.</p>
-                <button @click="() => { searchQuery = ''; selectedGenre = null; }" class="mt-4 text-yellow-500 hover:underline">
-                    Clear filters
-                </button>
+                <p class="text-xl text-gray-500 font-medium">No movies found.</p>
             </div>
 
             <Transition

@@ -52,7 +52,7 @@ const getFolderName = (id) => {
 </script>
 
 <template>
-    <Head title="My Collection" />
+    <Head title="Dashboard" />
 
     <MainLayout>
         <div class="min-h-screen bg-gray-950 text-white p-6 md:p-12">

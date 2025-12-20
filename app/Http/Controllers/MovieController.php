@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Movie;
 use App\Models\Genre;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Carbon\Carbon;
 
 class MovieController extends Controller
 {
@@ -30,6 +32,62 @@ class MovieController extends Controller
             }),
             'genres' => Genre::orderBy('name')->get(['id', 'name'])
         ]);
+    }
+
+    /**
+     * Display search results page.
+     */
+    public function search(Request $request)
+    {
+        $query = $request->input('q');
+
+        $movies = Movie::with('genres')
+            ->where('title', 'like', "%{$query}%")
+            ->orWhereHas('genres', function ($q) use ($query) {
+                $q->where('name', 'like', "%{$query}%");
+            })
+            ->get()
+            ->map(function($movie) {
+                return [
+                    'id' => $movie->id,
+                    'title' => $movie->title,
+                    'poster_url' => $movie->poster_path ? "https://image.tmdb.org/t/p/w500{$movie->poster_path}" : null,
+                    'rating' => $movie->average_rating,
+                    'global_rating' => $movie->vote_average,
+                    'genres' => $movie->genres->pluck('name'),
+                ];
+            });
+
+        return Inertia::render('Search/Results', [
+            'movies' => $movies,
+            'query' => $query
+        ]);
+    }
+
+    /**
+     * API for autocomplete suggestions.
+     */
+    public function suggestions(Request $request)
+    {
+        $query = $request->input('q');
+
+        if (!$query || strlen($query) < 2) {
+            return response()->json([]);
+        }
+
+        $movies = Movie::where('title', 'like', "%{$query}%")
+            ->take(5)
+            ->get(['id', 'title', 'poster_path', 'release_date', 'vote_average']);
+
+        return response()->json($movies->map(function ($movie) {
+            return [
+                'id' => $movie->id,
+                'title' => $movie->title,
+                'year' => $movie->release_date ? Carbon::parse($movie->release_date)->year : '',
+                'rating' => $movie->vote_average,
+                'poster_url' => $movie->poster_path ? "https://image.tmdb.org/t/p/w92{$movie->poster_path}" : null,
+            ];
+        }));
     }
 
     /**

@@ -10,6 +10,9 @@ use Inertia\Inertia;
 Route::get('/', [MovieController::class, 'index'])->name('home');
 Route::get('/movies/{movie}', [MovieController::class, 'show'])->name('movies.show');
 
+Route::get('/search', [MovieController::class, 'search'])->name('search.index');
+Route::get('/api/search/suggestions', [MovieController::class, 'suggestions'])->name('search.suggestions');
+
 Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', [UserMovieController::class, 'index'])->name('dashboard');
     Route::post('/folders', [UserMovieController::class, 'storeFolder'])->name('folders.store');
