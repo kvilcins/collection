@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Movie;
+use App\Models\Genre;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
@@ -26,7 +27,8 @@ class MovieController extends Controller
                     'global_rating' => $movie->vote_average,
                     'genres' => $movie->genres->pluck('name'),
                 ];
-            })
+            }),
+            'genres' => Genre::orderBy('name')->get(['id', 'name'])
         ]);
     }
 
