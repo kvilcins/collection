@@ -30,6 +30,8 @@ class AdminPanelProvider extends PanelProvider
             ->colors([
                 'primary' => Color::Amber,
             ])
+            ->favicon(asset('favicon.ico'))
+            ->brandName('CoolMovies Admin')
             ->authGuard('admin')
             ->authPasswordBroker('admins')
 
