@@ -4,18 +4,22 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 
 const props = defineProps({
     movie: Object,
-    folders: Array
+    folders: Array,
+    user_movie: Object
 });
 
 const form = useForm({
-    status: 'watchlist',
-    folder_id: null,
-    personal_rating: null
+    status: props.user_movie?.pivot?.status || 'watchlist',
+    folder_id: props.user_movie?.pivot?.folder_id || null,
+    personal_rating: props.user_movie?.pivot?.personal_rating || null
 });
 
 const submitToCollection = () => {
     form.post(route('user-movies.update', props.movie.id), {
-        onSuccess: () => alert('Updated in your collection!')
+        onSuccess: () => {
+            // Optional: Show notification or visual feedback
+        },
+        preserveScroll: true
     });
 };
 </script>
@@ -33,7 +37,14 @@ const submitToCollection = () => {
 
                     <div class="flex-grow">
                         <div class="flex items-center gap-4 mb-4">
-                            <span class="bg-yellow-500 text-black font-black px-4 py-1 rounded-lg text-2xl shadow-lg">★ {{ movie.rating }}</span>
+                            <div class="flex flex-col">
+                                <span class="bg-yellow-500 text-black font-black px-4 py-1 rounded-lg text-2xl shadow-lg flex items-center gap-2">
+                                    IMDb {{ movie.global_rating || 'N/A' }}
+                                </span>
+                                <span v-if="movie.rating > 0" class="text-yellow-500 text-sm font-bold mt-1 ml-1">
+                                    Portal Users: {{ movie.rating }}
+                                </span>
+                            </div>
                             <span class="text-gray-300 font-medium">{{ movie.release_date }}</span>
                         </div>
                         <h1 class="text-5xl md:text-7xl font-black mb-6 tracking-tight">{{ movie.title }}</h1>
@@ -69,6 +80,14 @@ const submitToCollection = () => {
 
                         <div class="space-y-4">
                             <div>
+                                <label class="text-xs text-gray-500 uppercase font-bold mb-2 block">Your Rating</label>
+                                <select v-model="form.personal_rating" class="w-full bg-black border-gray-800 rounded-xl text-sm focus:ring-yellow-500">
+                                    <option :value="null">Not Rated</option>
+                                    <option v-for="n in 10" :key="n" :value="n">{{ n }} ★</option>
+                                </select>
+                            </div>
+
+                            <div>
                                 <label class="text-xs text-gray-500 uppercase font-bold mb-2 block">Status</label>
                                 <select v-model="form.status" class="w-full bg-black border-gray-800 rounded-xl text-sm focus:ring-yellow-500">
                                     <option value="watchlist">Watchlist</option>
@@ -76,7 +95,7 @@ const submitToCollection = () => {
                                 </select>
                             </div>
 
-                            <div v-if="folders.length">
+                            <div>
                                 <label class="text-xs text-gray-500 uppercase font-bold mb-2 block">Move to Folder</label>
                                 <select v-model="form.folder_id" class="w-full bg-black border-gray-800 rounded-xl text-sm focus:ring-yellow-500">
                                     <option :value="null">No Folder</option>
@@ -85,7 +104,8 @@ const submitToCollection = () => {
                             </div>
 
                             <button @click="submitToCollection" class="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-2xl transition shadow-[0_10px_20px_rgba(234,179,8,0.2)]">
-                                SAVE TO MY LIST
+                                <span v-if="user_movie">UPDATE COLLECTION</span>
+                                <span v-else>ADD TO COLLECTION</span>
                             </button>
                         </div>
                     </div>

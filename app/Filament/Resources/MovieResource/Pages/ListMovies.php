@@ -15,6 +15,9 @@ class ListMovies extends ListRecords
 {
     protected static string $resource = MovieResource::class;
 
+    /**
+     * Define the actions available in the list header, including the custom import action.
+     */
     protected function getHeaderActions(): array
     {
         return [
@@ -35,6 +38,7 @@ class ListMovies extends ListRecords
                                 'overview' => $data['overview'],
                                 'poster_path' => $data['poster_path'],
                                 'release_date' => $data['release_date'] ?? null,
+                                'vote_average' => $data['vote_average'] ?? null,
                             ]
                         );
 

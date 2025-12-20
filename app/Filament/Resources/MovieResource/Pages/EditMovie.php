@@ -10,6 +10,9 @@ class EditMovie extends EditRecord
 {
     protected static string $resource = MovieResource::class;
 
+    /**
+     * Define the header actions available on the edit page.
+     */
     protected function getHeaderActions(): array
     {
         return [

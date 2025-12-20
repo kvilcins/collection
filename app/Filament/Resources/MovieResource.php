@@ -19,6 +19,9 @@ class MovieResource extends Resource
     protected static ?string $model = Movie::class;
     protected static ?string $navigationIcon = 'heroicon-o-film';
 
+    /**
+     * Define the form schema for creating and editing records.
+     */
     public static function form(Form $form): Form
     {
         return $form
@@ -43,6 +46,7 @@ class MovieResource extends Resource
                                     $set('overview', $data['overview']);
                                     $set('release_date', $data['release_date']);
                                     $set('poster_path', $data['poster_path']);
+                                    $set('vote_average', $data['vote_average'] ?? null);
 
                                     if (!empty($data['genre_ids'])) {
                                         $localGenreIds = Genre::whereIn('tmdb_genre_id', $data['genre_ids'])
@@ -73,6 +77,7 @@ class MovieResource extends Resource
 
                 Forms\Components\TextInput::make('tmdb_id')->required()->readOnly(),
                 Forms\Components\DatePicker::make('release_date'),
+                Forms\Components\TextInput::make('vote_average')->label('IMDb/TMDB Rating')->numeric(),
 
                 Forms\Components\Select::make('genres')
                     ->multiple()->relationship('genres', 'name')->preload(),
@@ -91,6 +96,9 @@ class MovieResource extends Resource
             ]);
     }
 
+    /**
+     * Define the table columns and actions for the list view.
+     */
     public static function table(Table $table): Table
     {
         return $table
@@ -99,6 +107,7 @@ class MovieResource extends Resource
                     ->state(fn($record) => "https://image.tmdb.org/t/p/w200{$record->poster_path}")
                     ->size(80),
                 Tables\Columns\TextColumn::make('title')->searchable(),
+                Tables\Columns\TextColumn::make('vote_average')->label('IMDb Rating')->sortable(),
                 Tables\Columns\TextColumn::make('genres.name')->badge()->color('success'),
                 Tables\Columns\TextColumn::make('tags.name')->badge()->color('info')->limitList(3),
             ])
@@ -106,6 +115,9 @@ class MovieResource extends Resource
             ->bulkActions([Tables\Actions\DeleteBulkAction::make()]);
     }
 
+    /**
+     * Register the pages used by this resource.
+     */
     public static function getPages(): array
     {
         return [

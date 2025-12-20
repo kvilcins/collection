@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Movie;
-use App\Models\Folder;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -28,7 +27,7 @@ class UserMovieController extends Controller
     }
 
     /**
-     * Create a new folder.
+     * Create a new folder for the authenticated user.
      */
     public function storeFolder(Request $request)
     {
@@ -38,17 +37,36 @@ class UserMovieController extends Controller
     }
 
     /**
-     * Update movie data (rating, status, folder).
+     * Update movie data (rating, status, folder) in the user's collection.
      */
     public function update(Request $request, Movie $movie)
     {
-        $request->user()->movies()->syncWithoutDetaching([
-            $movie->id => [
-                'status' => $request->status ?? 'watchlist',
-                'personal_rating' => $request->personal_rating,
-                'folder_id' => $request->folder_id,
-            ]
-        ]);
+        $attributes = [];
+
+        if ($request->has('status')) {
+            $attributes['status'] = $request->status;
+        }
+
+        if ($request->has('personal_rating')) {
+            $attributes['personal_rating'] = $request->personal_rating;
+        }
+
+        if ($request->exists('folder_id')) {
+            $attributes['folder_id'] = $request->folder_id;
+        }
+
+        $user = $request->user();
+
+        if (! $user->movies()->where('movie_id', $movie->id)->exists()) {
+            $user->movies()->attach($movie->id, [
+                'status' => $attributes['status'] ?? 'watchlist',
+                'folder_id' => $attributes['folder_id'] ?? null,
+                'personal_rating' => $attributes['personal_rating'] ?? null,
+            ]);
+        } else {
+            $user->movies()->updateExistingPivot($movie->id, $attributes);
+        }
+
         return back();
     }
 
